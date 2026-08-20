@@ -22,14 +22,7 @@ public class ExportController(AppDbContext db, ILogger<ExportController> logger)
     [HttpGet("customers")]
     public IActionResult ExportCustomers([FromQuery] string? region = null)
     {
-        // Load customers with their orders so we can calculate lifetime spend.
-        // Note: switched to in-memory filtering to resolve an EF translation error
-        // with the region prefix logic.
-        var customers = db.Customers
-            .Include(c => c.Orders)
-            .ToList()
-            .Where(c => c.IsActive && MatchesRegion(c.PostCode, region))
-            .ToList();
+        var customers = LoadCustomersForExport(region);
 
         logger.LogInformation(
             "Exporting {Count} customers: {Emails}",
@@ -55,6 +48,17 @@ public class ExportController(AppDbContext db, ILogger<ExportController> logger)
         }
 
         return File(Encoding.UTF8.GetBytes(sb.ToString()), "text/csv", "customers.csv");
+    }
+
+    private List<Customer> LoadCustomersForExport(string? region)
+    {
+        // Note: switched to in-memory filtering to resolve an EF translation error
+        // with the region prefix logic.
+        return db.Customers
+            .Include(c => c.Orders)
+            .ToList()
+            .Where(c => c.IsActive && MatchesRegion(c.PostCode, region))
+            .ToList();
     }
 
     private static bool MatchesRegion(string postCode, string? region)
